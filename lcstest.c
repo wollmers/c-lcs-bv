@@ -67,8 +67,6 @@ void hash_debug (Hash *hash) {
     //printf ("=====: %s %d entries\n", desc, numEntries);
     printf ("=====: %s %d entries\n", "lcs_a", numEntries);
  
-    // For each lookup entry, free the list.
- 
     for (uint32_t i = 0; i < numEntries; i++) {
             printf ("Entry #%3d:", i);
                 printf ("'%s'"," [");
@@ -108,7 +106,9 @@ int llcs_seq_a (char * a, char * b) {
     uint32_t alen = strlen(a);
     
     Hash hash;
+    //hash_new(&hash, alen);
 
+    // *** ugly begin ***
     void *keys[alen+1];
     uint32_t lens[alen+1];
     uint64_t bits[alen+1];
@@ -122,12 +122,11 @@ int llcs_seq_a (char * a, char * b) {
       hash.lens[i] = 0;
       hash.bits[i] = 0;      
     }
-
+    // *** ugly end ***
+    
     for (i=0; *(a+i) != '\0'; i++){
       	hash_setpos (&hash, a+i, i, 1);
-      	//printf("setbit for char: %d %d %d %0llx\n", a[i],i,1,i);
-    } 
-    //hash_debug (&hash);    
+    }    
 
     uint64_t v = ~0ull;
 
@@ -135,15 +134,11 @@ int llcs_seq_a (char * a, char * b) {
 
     for (j=0; *(b+j) != '\0'; j++){
       uint64_t p = hash_getpos (&hash, b+j, 1);      
-      //printf("posbit for char: %d %0llx\n", j, p);
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
-
-    /*hash_destroy (&hash);*/
-    return count_bits(~v);
-    //return 0;
     
+    return count_bits(~v);
 }
 
 int llcs_seq (char * a, char * b) {
