@@ -2,6 +2,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef struct {
     void **keys;
