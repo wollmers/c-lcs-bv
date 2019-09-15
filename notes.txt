@@ -1,0 +1,70 @@
+c-lcs-bv notes
+
+popcount (count bits)
+https://www.strchr.com/crc32_popcnt
+http://danluu.com/assembly-intrinsics/
+https://stackoverflow.com/questions/38113284/whats-the-difference-between-builtin-popcountll-and-mm-popcnt-u64
+_mm_popcnt_u64 is part of <nmmintrin.h>, a header devised by Intel for utility functions for accessing SSE 4.2 instructions.
+popcntintrin.h
+
+cc -std=c99 -pedantic -Wall -O3 -c -o lcstest.o lcstest.c 
+
+$ ./lcstest
+llcs        - ascii, calloc, sequential addressing
+llcs_a      - ascii, stack,  sequential addressing
+llcs_utf8   - utf8, calloc, sequential addressing
+llcs_utf8_a - utf8, stack, sequential addressing
+[llcs]        Elapsed: 0.635269 seconds Rate: 4722408.932279 (1/sec)
+[llcs_a]     Elapsed: 0.285003 seconds Rate: 10526204.987316 (1/sec)
+[llcs_utf8]   Elapsed: 1.347623 seconds Rate: 2226141.880927 (1/sec)
+[llcs_utf8_a] Elapsed: 0.938346 seconds Rate: 3197114.923493 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.055109 seconds Rate: 2843308.132146 (1/sec)
+
+########
+Running clang -O3 -mpopcnt -funroll-loops produces a binary that we can examine. 
+
+On macs, we can use otool -tv to get the disassembly. On linux, there's objdump -d.
+
+########
+cc -std=c11 -mpopcnt -pedantic -Wall -O3 -o lcstest lcstest.o
+
+$ ./lcstest
+llcs        - ascii, calloc, sequential addressing
+llcs_a      - ascii, stack,  sequential addressing
+llcs_utf8   - utf8, calloc, sequential addressing
+llcs_utf8_a - utf8, stack, sequential addressing
+[llcs]        Elapsed: 0.624085 seconds Rate: 4807037.502904 (1/sec)
+[llcs_a]      Elapsed: 0.275432 seconds Rate: 10891980.597752 (1/sec)
+[llcs_utf8]   Elapsed: 1.343073 seconds Rate: 2233683.500450 (1/sec)
+[llcs_utf8_a] Elapsed: 0.950979 seconds Rate: 3154643.793396 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.139648 seconds Rate: 2632391.756051 (1/sec)
+
+#########
+2019-09-15 (old)
+
+cc -std=c11 -mpopcnt -pedantic -Wall -O3 -o lcstest lcstest.o
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+llcs        - ascii, calloc, sequential addressing
+llcs_a      - ascii, stack,  sequential addressing
+llcs_utf8   - utf8, calloc, sequential addressing
+llcs_utf8_a - utf8, stack, sequential addressing
+llcs_utf8_i - utf8, stack, sequential addressing, store key
+[llcs]        Elapsed: 0.623470 seconds Rate: 4811779.235569 (1/sec)
+[llcs_a]      Elapsed: 0.269870 seconds Rate: 11116463.482417 (1/sec)
+[llcs_utf8]   Elapsed: 1.358969 seconds Rate: 2207555.875079 (1/sec)
+llcs_utf8_a: 7
+[llcs_utf8_a] Elapsed: 0.916799 seconds Rate: 3272254.878114 (1/sec)
+llcs_utf8_i: 7
+[llcs_utf8_i] Elapsed: 0.316867 seconds Rate: 9467694.647912 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.006791 seconds Rate: 2979764.419825 (1/sec)
+
+###########

@@ -1,6 +1,10 @@
 
 CC = cc
-CFLAGS = -std=c99 -pedantic -Wall -O3
+# CFLAGS = -std=c99 -pedantic -Wall -O3
+CFLAGS = -std=c11 -mpopcnt -pedantic -Wall -O3
+#CFLAGS =  -Wall -O3
+#CFLAGS = clang -O3  -funroll-loops
+
 
 all: lcstest
 
