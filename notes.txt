@@ -87,4 +87,25 @@ lcs_utf8_a: 7
 0	1	3	4	6	9	10	
 [lcs_utf8_a] Elapsed: 1.031241 seconds Rate: 2909116.297742 (1/sec)
 
+###########
 
+cleanup, without popcount
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ make rebuild
+rm -rf *.o lcstest
+cc -Wall -O3 -c -o lcstest.o lcstest.c 
+cc -Wall -O3 -o lcstest lcstest.o
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+llcs_asci_a - ascii, stack, sequential addressing
+llcs_asci_i - ascii, stack, sequential addressing, store key
+llcs_utf8_a - utf-8, stack, sequential addressing
+llcs_utf8_i - utf-8, stack, sequential addressing, store key
+
+[llcs_a]      Elapsed: 0.275416 seconds Rate: 10892613.355796 (1/sec)
+[llcs_i]      Elapsed: 0.256856 seconds Rate: 11679696.016445 (1/sec)
+[llcs_utf8_a] Elapsed: 0.894783 seconds Rate: 3352768.213075 (1/sec)
+[llcs_utf8_i] Elapsed: 0.303757 seconds Rate: 9876315.607542 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.034902 seconds Rate: 2898825.202773 (1/sec)

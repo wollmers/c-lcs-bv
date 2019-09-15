@@ -13,33 +13,9 @@ typedef struct {
 
 typedef struct {
     uint32_t *ikeys;
-    uint32_t *lens;
+    //uint32_t *lens;
     uint64_t *bits;
 } Hashi;
-
-// calloc
-void hash_new (Hash *hash, int size) {
-    hash->keys = calloc(size+1, 
-    	sizeof (void *)+sizeof (uint32_t *)+sizeof (uint64_t *));
-    hash->lens = (uint32_t *)hash->keys + ((size+1) * sizeof (void *));
-    hash->bits = (uint64_t *)hash->lens + ((size+1) * sizeof (uint32_t *));
-}
-
-// alloca
-void hash_new_a (Hash *hash, int alen) {
-    uint32_t size = (alen+1) * (
-       sizeof (void *)+sizeof (uint32_t *)+sizeof (uint64_t *)
-    );
-    hash->keys = alloca(size);
-    memset(hash->keys, 0, size);
-
-    hash->lens = (uint32_t *)hash->keys + ((alen+1) * sizeof (void *));
-    hash->bits = (uint64_t *)hash->lens + ((alen+1) * sizeof (uint32_t *));
-}
-
-void hash_destroy (Hash *hash) {
-    free (hash->keys);
-}
  
 // memcmp; insert or return 
 int hash_index (Hash *hash, char *key, uint32_t keylen) {
@@ -176,9 +152,9 @@ int llcs_asci_a (char * a, char * b) {
       v = (v + u) | (v - u);
     }
     
-    //return count_bits(~v);
+    return count_bits(~v);
     //return __builtin_popcountll(~v); // portable
-    return _mm_popcnt_u64(~v);
+    //return _mm_popcnt_u64(~v);
 }
 
 
@@ -211,20 +187,16 @@ int llcs_utf8_a (char * a, char * b) {
       	//printf("setbit for char: %d %d %d %0llx\n", a[q],q,keylen,i);
     }     
     
-    //hash_debug (&hash, "seq_utf8_a");
-    
     uint64_t v = ~0ull;
 
     //for (q=0; (unsigned char)b[q] != '\0'; q+=keylen){
     for (q=0; q < blen; q+=keylen){
       keylen = allBytesForUTF8[(unsigned int)(unsigned char)b[q]]; 
       uint64_t p = hash_getpos (&hash, b+q, keylen);      
-      //printf("posbit for char: %d %d %d %0llx\n", b[q],q,keylen, p);
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
 
-    //hash_destroy (&hash);
     return count_bits(~v);
 }
 
@@ -233,32 +205,23 @@ int llcs_asci_i (char * a, char * b, uint32_t alen, uint32_t blen) {
     //uint32_t alen = strlen(a);
     
     Hashi hashi;
-    //hash_new(&hash, alen);
     uint32_t ikeys[alen+1];
-    uint32_t lens[alen+1];
     uint64_t bits[alen+1];
     hashi.ikeys = ikeys;
-    hashi.lens = lens;
     hashi.bits = bits;
 
     int32_t i;
     for (i=0;i<=alen;i++) { 
       hashi.ikeys[i] = 0;
-      hashi.lens[i] = 0;
       hashi.bits[i] = 0;      
     }
     
-    //uint32_t q, keylen;
     uint32_t key;
     //for (i=0; *(a+i) != '\0'; i++){
     for (i=0,key=0; i < alen; i++){
-      	//hash_setpos (&hash, a+i, i, 1);
-      	//key = key << 8 | a[i];
       	key = a[i];
       	hashi_setpos (&hashi, key, i);
-    }    
-
-    //hash_debug (&hash, "seq_a");
+    }
 
     uint64_t v = ~0ull;
 
@@ -266,36 +229,29 @@ int llcs_asci_i (char * a, char * b, uint32_t alen, uint32_t blen) {
 
     //for (j=0; *(b+j) != '\0'; j++){
     for (j=0,key=0; j < blen; j++){
-      //uint64_t p = hash_getpos (&hash, b+j, 1);
       key = b[j];
       uint64_t p = hashi_getpos (&hashi, key);      
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
     
-    //return count_bits(~v);
+    return count_bits(~v);
     //return __builtin_popcountll(~v); // portable
-    return _mm_popcnt_u64(~v);
+    //return _mm_popcnt_u64(~v);
 }
 
 // use utf-8 sequence as uint32_t key
 int llcs_utf8_i (char * a, char * b, uint32_t alen, uint32_t blen) {
-    //uint32_t alen = strlen(a);
-    //uint32_t blen = strlen(b);
     
     Hashi hashi;
-    //hash_new(&hash, alen);
     uint32_t ikeys[alen+1];
-    uint32_t lens[alen+1];
     uint64_t bits[alen+1];
     hashi.ikeys = ikeys;
-    hashi.lens = lens;
     hashi.bits = bits;
 
     int32_t i;
     for (i=0;i<=alen;i++) { 
       hashi.ikeys[i] = 0;
-      hashi.lens[i] = 0;
       hashi.bits[i] = 0;      
     }
 
@@ -308,14 +264,10 @@ int llcs_utf8_i (char * a, char * b, uint32_t alen, uint32_t blen) {
           key = key << 8 | a[q+k];
         }
       	hashi_setpos (&hashi, key, i);
-      	//printf("setbit for char: %d %d %d %0llx\n", a[q],q,keylen,i);
     }
-    
-    //hash_debug (&hash, "seq_utf8_a");
     
     uint64_t v = ~0ull;
     int32_t j;
-    //uint64_t Vs[blen+1];
 
     //for (q=0; (unsigned char)b[q] != '\0'; q+=keylen){
     for (j=0,q=0; q < blen; j++,q+=keylen){
@@ -325,7 +277,6 @@ int llcs_utf8_i (char * a, char * b, uint32_t alen, uint32_t blen) {
         }      
        
       uint64_t p = hashi_getpos (&hashi, key);      
-      //printf("posbit for char: %d %d %d %0llx\n", b[q],q,keylen, p);
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
@@ -341,7 +292,6 @@ int lcs_seq_utf8_a (char * a, char * b, int32_t (* lcs)[2]) {
     uint32_t blen = strlen(b);
     
     Hash hash;
-    //hash_new(&hash, alen);
     void *keys[alen+1];
     uint32_t lens[alen+1];
     uint64_t bits[alen+1];
@@ -361,7 +311,6 @@ int lcs_seq_utf8_a (char * a, char * b, int32_t (* lcs)[2]) {
     for (i=0,q=0; q < alen; i++,q+=keylen){
         keylen = allBytesForUTF8[(unsigned int)(unsigned char)a[q]];
       	hash_setpos (&hash, a+q, i, keylen);
-      	//printf("setbit for char: %d %d %d %0llx\n", a[q],q,keylen,i);
     }     
     
     //hash_debug (&hash, "seq_utf8_a");
@@ -470,11 +419,11 @@ int main (void) {
     int length_lcs;
     /* ################### */
 
-    printf("llcs_asci_a - ascii, stack,  sequential addressing\n");
-    printf("llcs_asci_i - ascii, stack,  sequential addressing, store key\n");
-    printf("llcs_utf8_a - utf8, stack, sequential addressing\n");
-    printf("llcs_utf8_i - utf8, stack, sequential addressing, store key\n");
-
+    printf("llcs_asci_a - ascii, stack, sequential addressing\n");
+    printf("llcs_asci_i - ascii, stack, sequential addressing, store key\n");
+    printf("llcs_utf8_a - utf-8, stack, sequential addressing\n");
+    printf("llcs_utf8_i - utf-8, stack, sequential addressing, store key\n");
+    printf("\n");
 
     /* ########## llcs_asci_a ########## */
     
@@ -520,7 +469,7 @@ int main (void) {
   	for (count = 0; count < 1; count++) {
       	length_lcs = llcs_utf8_a (str1, str2);
       	//printf("llcs - utf8, stack, sequential addressing\n");
-      	printf("llcs_utf8_a: %d\n", length_lcs);
+      	//printf("llcs_utf8_a: %d\n", length_lcs);
   	}
      
     tic = clock();
@@ -541,7 +490,7 @@ int main (void) {
       	//length_lcs = llcs_seq_utf8_i (str1, str2);
       	length_lcs = llcs_utf8_i (str1, str2, len1, len2);
       	//printf("llcs - utf8, stack, sequential addressing\n");
-      	printf("llcs_utf8_i: %d\n", length_lcs);
+      	//printf("llcs_utf8_i: %d\n", length_lcs);
   	}
      
     tic = clock();
