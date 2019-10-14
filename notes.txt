@@ -109,3 +109,72 @@ lcs_utf8_a: 7
 0	1	3	4	6	8	9	
 0	1	3	4	6	9	10	
 [lcs_utf8_a] Elapsed: 1.034902 seconds Rate: 2898825.202773 (1/sec)
+
+############
+
+further cleanup
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+llcs_asci_a - ascii, stack, sequential addressing
+llcs_asci_i - ascii, stack, sequential addressing, store key
+llcs_utf8_a - utf-8, stack, sequential addressing
+llcs_utf8_i - utf-8, stack, sequential addressing, store key
+
+[llcs_a]      Elapsed: 0.274226 seconds Rate: 10939881.703413 (1/sec)
+llcs_a: 7
+[llcs_i]      Elapsed: 0.255108 seconds Rate: 11759725.292817 (1/sec)
+llcs_utf8_a: 7
+[llcs_utf8_a] Elapsed: 0.904264 seconds Rate: 3317615.209718 (1/sec)
+[llcs_utf8_i] Elapsed: 0.317548 seconds Rate: 9447390.630708 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.015980 seconds Rate: 2952814.031772 (1/sec)
+
+################
+$ make rebuild
+rm -rf *.o lcstest
+cc -std=c11 -mpopcnt -pedantic -Wall -Ofast -c -o lcstest.o lcstest.c 
+cc -std=c11 -mpopcnt -pedantic -Wall -Ofast -o lcstest lcstest.o
+
+$ ./lcstest
+llcs_asci_a - ascii, stack, sequential addressing
+llcs_asci_i - ascii, stack, sequential addressing, store key
+llcs_utf8_a - utf-8, stack, sequential addressing
+llcs_utf8_i - utf-8, stack, sequential addressing, store key
+
+[llcs_a]      Elapsed: 0.296190 seconds Rate: 10128633.647321 (1/sec)
+llcs_a: 7
+[llcs_i]      Elapsed: 0.245821 seconds Rate: 12204002.099088 (1/sec)
+llcs_utf8_a: 7
+[llcs_utf8_a] Elapsed: 0.934339 seconds Rate: 3210826.049218 (1/sec)
+[llcs_utf8_i] Elapsed: 0.296865 seconds Rate: 10105603.557172 (1/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 1.008869 seconds Rate: 2973626.902997 (1/sec)
+
+###############
+2019-10-14
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ time ./lcstest
+llcs_asci_i - ascii, stack, sequential addressing, store key
+llcs_asci_t - ascii, table
+llcs_utf8_i - utf-8, stack, sequential addressing, store key
+
+llcs_asci_i: 7
+[llcs_asci_i]      Elapsed: 1.209065 seconds Rate: 12.406281 (M/sec)
+llcs_asci_t: 7
+llcs_asci_t: 7
+[llcs_asci_t] Elapsed: 0.000001000 seconds Rate: 1000000000000.0 (T/sec)
+[llcs_utf8_i] Elapsed: 1.029697 seconds Rate: 9.711595 (M/sec)
+lcs_utf8_a: 7
+0	1	3	4	6	8	9	
+0	1	3	4	6	9	10	
+[lcs_utf8_a] Elapsed: 0.965734 seconds Rate: 3.106445 (M/sec)
+Total: 3.204497 seconds
+
+real	0m3.210s
+user	0m3.205s
+sys	0m0.003s
+
