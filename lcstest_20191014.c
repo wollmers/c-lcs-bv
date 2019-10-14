@@ -2,7 +2,6 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <nmmintrin.h>
 
 
@@ -86,7 +85,7 @@ void hash_debug (Hash *hash, char *desc) {
   		    printf("%.1s", (char *)hash->keys[i] + j);
 		}
         printf ("'%s'"," = ");
-  		//printf("%llu", hash->bits[i] ); //TODO: warning: format ‘%llu’ expects argument of type ‘long long unsigned int’
+  		printf("%llu", hash->bits[i] );
         printf ("'%s'\n","]");
 
     }
@@ -415,14 +414,13 @@ int main (void) {
     clock_t tic;
     clock_t toc;
     double elapsed;
-    double total = 0;
     double rate;
     
     uint64_t count;
-    uint64_t megacount;
-    uint32_t iters     = 1000000;
-    uint32_t megaiters = 1;
-    
+    uint32_t iters = 3 * 1000000;
+    //uint64_t aiters = 1000000000000000000;
+    uint64_t aiters = 0x0000000100000000ull;
+    //uint32_t iters = 1;
     
     char str1[] = "Choerephon";
     char str2[] = "Chrerrplzon";
@@ -455,33 +453,50 @@ int main (void) {
     int length_lcs;
     /* ################### */
 
+    printf("llcs_asci_a - ascii, stack, sequential addressing\n");
     printf("llcs_asci_i - ascii, stack, sequential addressing, store key\n");
     printf("llcs_asci_t - ascii, table\n");
+    printf("llcs_utf8_a - utf-8, stack, sequential addressing\n");
     printf("llcs_utf8_i - utf-8, stack, sequential addressing, store key\n");
     printf("\n");
+
+    /* ########## llcs_asci_a ########## */
+    
+  	for (count = 0; count < 1; count++) {
+      	length_lcs = llcs_asci_a (str1, str2);
+      	//printf("llcs_a - ascii, stack, sequential addressing\n");
+      	printf("llcs_a: %d\n", length_lcs);
+  	}
+     
+    tic = clock();
+    
+  	for (count = 0; count < iters; count++) {
+      	length_lcs = llcs_asci_a (str1, str2);
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
+    rate    = (double)iters / elapsed;
+    printf("[llcs_a]      Elapsed: %f seconds Rate: %f (1/sec)\n", elapsed, rate);
 
     /* ######### llcs_asci_i ########### */
     
   	for (count = 0; count < 1; count++) {
       	length_lcs = llcs_asci_i (str1, str2, len1, len2);
       	//printf("llcs_a - ascii, stack, sequential addressing\n");
-      	printf("llcs_asci_i: %d\n", length_lcs);
+      	printf("llcs_a: %d\n", length_lcs);
   	}
      
     tic = clock();
     
-    megaiters = 15;
-    for (megacount = 0; megacount < megaiters; megacount++) {
-  	  for (count = 0; count < iters; count++) {
+  	for (count = 0; count < iters; count++) {
       	length_lcs = llcs_asci_i (str1, str2, len1, len2);
-  	  }
   	}
 
     toc = clock();
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
-    total += elapsed;
-    rate    = (double)megaiters / elapsed;
-    printf("[llcs_asci_i]      Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
+    rate    = (double)iters / elapsed;
+    printf("[llcs_i]      Elapsed: %f seconds Rate: %f (1/sec)\n", elapsed, rate);
     
     /* ########## llcs_asci_t ########## */
 
@@ -495,37 +510,46 @@ int main (void) {
       	length_lcs = llcs_asci_t (astr3, astr4, len1, len2);
       	//printf("llcs - utf8, stack, sequential addressing\n");
       	printf("llcs_asci_t: %d\n", length_lcs);
-  	} 
-  	   
+  	}    
     tic = clock();
     
-    uint32_t teraiters = 1000000;
-    uint32_t teracount;
-    megaiters = 1000000;
-    
-    for (teracount = 0; teracount < teraiters; teracount++) {
-    for (megacount = 0; megacount < megaiters; megacount++) {
-  	  for (count = 0; count < iters; count++) {
-  	    if (count % 2) {
-      	  length_lcs = llcs_asci_t (astr1, astr2, len1, len2);
+    //aiters = 4;
+  	for (count = 0; count < aiters; count++) {
+  	  if (count % 2) {
+      	length_lcs = llcs_asci_t (astr1, astr2, len1, len2);
       	//printf("llcs_asci_t: %d\n", length_lcs);
-        }
-        else {
-          length_lcs = llcs_asci_t (astr3, astr4, len1, len2);
+      }
+      else {
+        length_lcs = llcs_asci_t (astr3, astr4, len1, len2);
         //printf("llcs_asci_t: %d\n", length_lcs);
-        }
-  	  }
-  	}
+      }
   	}
 
     toc = clock();
     elapsed = (double)(toc - tic) / (double)CLOCKS_PER_SEC;
-    total += elapsed;
-    rate    = (double)teraiters / (double)elapsed;
+    rate    = (double)aiters / (double)elapsed;
     
-    printf("[llcs_asci_t] Elapsed: %.9f seconds Rate: %.1f (T/sec)\n", elapsed, rate);
+    printf("[llcs_asci_t] Elapsed: %.9f seconds Rate: %.0f (1/sec)\n", elapsed, rate);
     
+    /* ########## llcs_utf8_a ########## */
 
+  
+  	for (count = 0; count < 1; count++) {
+      	length_lcs = llcs_utf8_a (str1, str2);
+      	//printf("llcs - utf8, stack, sequential addressing\n");
+      	printf("llcs_utf8_a: %d\n", length_lcs);
+  	}
+     
+    tic = clock();
+    
+  	for (count = 0; count < iters; count++) {
+      	length_lcs = llcs_utf8_a (str1, str2);
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
+    rate    = (double)iters / elapsed;
+    printf("[llcs_utf8_a] Elapsed: %f seconds Rate: %f (1/sec)\n", elapsed, rate);
     /* ########## llcs_utf8_i ########## */
 
   
@@ -538,18 +562,15 @@ int main (void) {
      
     tic = clock();
     
-    megaiters = 10;
-    for (megacount = 0; megacount < megaiters; megacount++) {   
-  	  for (count = 0; count < iters; count++) {
+  	for (count = 0; count < iters; count++) {
+      	//length_lcs = llcs_seq_utf8_i (str1, str2);
       	length_lcs = llcs_utf8_i (str1, str2, len1, len2);
-  	  }
   	}
 
     toc = clock();
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
-    total += elapsed;
-    rate    = (double)megaiters / elapsed;
-    printf("[llcs_utf8_i] Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
+    rate    = (double)iters / elapsed;
+    printf("[llcs_utf8_i] Elapsed: %f seconds Rate: %f (1/sec)\n", elapsed, rate);
 
     /* ######## LCS ############ */
     
@@ -577,27 +598,21 @@ int main (void) {
   	}
      
     tic = clock();
-
-    megaiters = 3;
-    for (megacount = 0; megacount < megaiters; megacount++) {    
-  	  for (count = 0; count < iters; count++) {
+    
+  	for (count = 0; count < iters; count++) {
 
   	    lcs[0][0] = -1;
   	    lcs[0][1] = -1;
   	    
       	length_lcs = lcs_seq_utf8_a (str1, str2, lcs);
-  	  }
   	}
 
     toc = clock();
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
-    total += elapsed;
-    rate    = (double)megaiters / elapsed;
-    printf("[lcs_utf8_a] Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
+    rate    = (double)iters / elapsed;
+    printf("[lcs_utf8_a] Elapsed: %f seconds Rate: %f (1/sec)\n", elapsed, rate);
 
-    /* #################### */
-    printf("Total: %f seconds\n", total);
-                      
+    /* #################### */                  
     return 0;
 
 }
