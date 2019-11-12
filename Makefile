@@ -1,7 +1,8 @@
 
 CC = cc
 #CFLAGS = -std=c99 -pedantic -Wall -O9
-CFLAGS = -std=c11 -mpopcnt -pedantic -Wall -Ofast
+CFLAGS = -std=c99 -mpopcnt -pedantic -Wall -Ofast
+#CFLAGS = -std=c11 -mpopcnt -pedantic -Wall -O1
 #CFLAGS =  -Wall -O3
 #CFLAGS =  -Wall -O9
 #CFLAGS = clang -O3  -funroll-loops

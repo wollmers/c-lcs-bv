@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <limits.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
@@ -94,6 +95,7 @@ void hash_debug (Hash *hash, char *desc) {
 }
 
 int count_bits(uint64_t bits) {
+    // 24 operations
     bits = (bits & 0x5555555555555555ull) + ((bits & 0xaaaaaaaaaaaaaaaaull) >> 1);
     bits = (bits & 0x3333333333333333ull) + ((bits & 0xccccccccccccccccull) >> 2);
     bits = (bits & 0x0f0f0f0f0f0f0f0full) + ((bits & 0xf0f0f0f0f0f0f0f0ull) >> 4);
@@ -101,6 +103,17 @@ int count_bits(uint64_t bits) {
     bits = (bits & 0x0000ffff0000ffffull) + ((bits & 0xffff0000ffff0000ull) >>16);
     return (bits & 0x00000000ffffffffull) + ((bits & 0xffffffff00000000ull) >>32);
 }
+
+int count_bits_fast(uint64_t bits) {
+    // 12 operations
+    bits = bits - ((bits >> 1) & 0x5555555555555555ull);
+    bits = (bits & 0x3333333333333333ull) + ((bits >> 2) & 0x3333333333333333ull);
+    // (bytesof(bits) -1) * bitsofbyte = (8-1)*8 = 56 ------------------------vv
+    bits = ((bits + (bits >> 4) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
+
+    return bits;
+}
+
 
 static const char allBytesForUTF8[256] = {
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -112,32 +125,176 @@ static const char allBytesForUTF8[256] = {
     2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
     3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,5,5,5,5,6,6,6,6
 };
+/*
+static uint64_t posbits[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+*/
 
-// use table
-int llcs_asci_t (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
-    
-    uint64_t bits[128];
+// use table (16 LoCs, 12 netLoCs, 22 instr)
+int llcs_asci_t_f (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
+
+static uint64_t posbits[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
 
     uint32_t i;
-    for (i=0; i<128; i++) { 
-      bits[i] = 0;      
-    }
 
+/*    
+    static uint64_t posbits[256];
+
+
+    for (i=0; i<256; i++) { 
+        posbits[i] = 0;      
+    }
+*/
     for (i=0; i < alen; i++){
-      	bits[a[i]] |= 1 << (i % 64);
+      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
     }    
 
     uint64_t v = ~0ull;
 
     for (i=0; i < blen; i++){
-      uint64_t p = bits[b[i]];
+      uint64_t p = posbits[(unsigned int)b[i]];
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
     
-    //return count_bits(~v);
-    //return __builtin_popcountll(~v); // portable
-    return _mm_popcnt_u64(~v);
+    return count_bits_fast(~v); 
+}
+
+// use table (16 LoCs, 12 netLoCs, 22 instr)
+int llcs_asci_t_c (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
+    
+static uint64_t posbits[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+
+    uint32_t i;
+
+/*    
+    static uint64_t posbits[256];
+
+
+    for (i=0; i<256; i++) { 
+        posbits[i] = 0;      
+    }
+*/
+
+    for (i=0; i < alen; i++){
+      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+    }    
+
+    uint64_t v = ~0ull;
+
+    for (i=0; i < blen; i++){
+      uint64_t p = posbits[(unsigned int)b[i]];
+      uint64_t u = v & p;
+      v = (v + u) | (v - u);
+    }
+    
+    return count_bits(~v);           // perfect portable
+}
+
+// use table (16 LoCs, 12 netLoCs, 22 instr)
+int llcs_asci_t_b (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
+    
+static uint64_t posbits[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+
+    uint32_t i;
+
+/*    
+    static uint64_t posbits[256];
+
+
+    for (i=0; i<256; i++) { 
+        posbits[i] = 0;      
+    }
+*/
+
+    for (i=0; i < alen; i++){
+      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+    }    
+
+    uint64_t v = ~0ull;
+
+    for (i=0; i < blen; i++){
+      uint64_t p = posbits[(unsigned int)b[i]];
+      uint64_t u = v & p;
+      v = (v + u) | (v - u);
+    }
+    
+    return __builtin_popcountll(~v); // portable
+}
+
+// use table (16 LoCs, 12 netLoCs, 22 instr)
+int llcs_asci_t_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
+    
+static uint64_t posbits[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+};
+
+    uint32_t i;
+
+/*    
+    static uint64_t posbits[256];
+
+
+    for (i=0; i<256; i++) { 
+        posbits[i] = 0;      
+    }
+*/
+
+    for (i=0; i < alen; i++){
+      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+    }    
+
+    uint64_t v = ~0ull;
+
+    for (i=0; i < blen; i++){
+      uint64_t p = posbits[(unsigned int)b[i]];
+      uint64_t u = v & p;
+      v = (v + u) | (v - u);
+    }
+    
+    return _mm_popcnt_u64(~v);         // MMX
 }
 
 // use stack for hash
@@ -174,9 +331,9 @@ int llcs_asci_a (char * a, char * b) {
       v = (v + u) | (v - u);
     }
     
-    //return count_bits(~v);
+    return count_bits(~v);
     //return __builtin_popcountll(~v); // portable
-    return _mm_popcnt_u64(~v);
+    //return _mm_popcnt_u64(~v);
 }
 
 
@@ -223,7 +380,7 @@ int llcs_utf8_a (char * a, char * b) {
 }
 
 // use stack for hash
-int llcs_asci_i (char * a, char * b, uint32_t alen, uint32_t blen) {
+int llcs_asci_i_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
     
     Hashi hashi;
     uint32_t ikeys[alen+1];
@@ -429,51 +586,35 @@ int main (void) {
     
     unsigned char astr1[] = "Choerephon";
     unsigned char astr2[] = "Chrerrplzon";
-    unsigned char astr3[] = "ChoerePhon";
-    unsigned char astr4[] = "ChtertPlzon";
-    
-    //char str1[] = "Chöerephon";
-    //char str2[] = "Chöerrplzon";
-    
-    //char str1[] = "coult n0t creAte has";
-    //char str2[] = "Could not create has";
-    
-    //char str1[] = "Could not create hash pfHashTable *tbl =";
-    //char str1[] = "Could not create hash pfHashTable *tbl = pfHashCreate (NULL)";
-
-    
-    //char str1[] = "used";
-    //char str2[] = "sued";
     
     uint32_t len1 = strlen(str1);
     uint32_t len2 = strlen(str2);
     
     //uint32_t alen1 = strlen(astr1);
     //uint32_t alen2 = strlen(astr2);
+    
+    printf("Storage size for char : %lu \n", sizeof(char));
 
     
     int length_lcs;
     /* ################### */
 
-    printf("llcs_asci_i - ascii, stack, sequential addressing, store key\n");
-    printf("llcs_asci_t - ascii, table\n");
-    printf("llcs_utf8_i - utf-8, stack, sequential addressing, store key\n");
+    printf("llcs_asci_i_p - ascii, stack, sequential addressing, store key\n");
+    printf("llcs_asci_t_c - ascii, table, count_bits\n");
+    printf("llcs_asci_t_f - ascii, table, count_bits_fast\n");
+    printf("llcs_asci_t_b - ascii, table, __builtin_popcountll\n");
+    printf("llcs_asci_t_p - ascii, table, _mm_popcnt_u64\n");
+    //printf("llcs_utf8_i - utf-8, stack, sequential addressing, store key\n");
     printf("\n");
 
-    /* ######### llcs_asci_i ########### */
+    /* ######### llcs_asci_i_p ########### */
     
-  	for (count = 0; count < 1; count++) {
-      	length_lcs = llcs_asci_i (str1, str2, len1, len2);
-      	//printf("llcs_a - ascii, stack, sequential addressing\n");
-      	printf("llcs_asci_i: %d\n", length_lcs);
-  	}
-     
+//if (1) {
     tic = clock();
-    
-    megaiters = 15;
+    megaiters = 20;
     for (megacount = 0; megacount < megaiters; megacount++) {
   	  for (count = 0; count < iters; count++) {
-      	length_lcs = llcs_asci_i (str1, str2, len1, len2);
+      	length_lcs = llcs_asci_i_p (astr1, astr2, len1, len2);
   	  }
   	}
 
@@ -481,53 +622,90 @@ int main (void) {
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
     total += elapsed;
     rate    = (double)megaiters / elapsed;
-    printf("[llcs_asci_i]      Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
-    
-    /* ########## llcs_asci_t ########## */
-
-  
-  	for (count = 0; count < 1; count++) {
-      	length_lcs = llcs_asci_t (astr1, astr2, len1, len2);
-      	//printf("llcs - utf8, stack, sequential addressing\n");
-      	printf("llcs_asci_t: %d\n", length_lcs);
-  	}
-   	for (count = 0; count < 1; count++) {
-      	length_lcs = llcs_asci_t (astr3, astr4, len1, len2);
-      	//printf("llcs - utf8, stack, sequential addressing\n");
-      	printf("llcs_asci_t: %d\n", length_lcs);
-  	} 
-  	   
+    printf("[llcs_asci_i_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+//}     
+    /* ########## llcs_asci_t_c ########## */
+if (1) {  	   
     tic = clock();
+
+    megaiters = 15;
     
-    uint32_t teraiters = 1000000;
-    uint32_t teracount;
-    megaiters = 1000000;
-    
-    for (teracount = 0; teracount < teraiters; teracount++) {
     for (megacount = 0; megacount < megaiters; megacount++) {
   	  for (count = 0; count < iters; count++) {
-  	    if (count % 2) {
-      	  length_lcs = llcs_asci_t (astr1, astr2, len1, len2);
-      	//printf("llcs_asci_t: %d\n", length_lcs);
-        }
-        else {
-          length_lcs = llcs_asci_t (astr3, astr4, len1, len2);
-        //printf("llcs_asci_t: %d\n", length_lcs);
-        }
+  	    length_lcs = llcs_asci_t_c (astr1, astr2, len1, len2);
   	  }
-  	}
   	}
 
     toc = clock();
     elapsed = (double)(toc - tic) / (double)CLOCKS_PER_SEC;
     total += elapsed;
-    rate    = (double)teraiters / (double)elapsed;
+    rate    = (double)megaiters / (double)elapsed;
     
-    printf("[llcs_asci_t] Elapsed: %.9f seconds Rate: %.1f (T/sec)\n", elapsed, rate);
+    printf("[llcs_asci_t_c] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+}  
+          
+    /* ########## llcs_asci_t_f ########## */
+if (1) { 	   
+    tic = clock();
+
+    megaiters = 20;
     
+    for (megacount = 0; megacount < megaiters; megacount++) {
+  	  for (count = 0; count < iters; count++) {
+      	  length_lcs = llcs_asci_t_f (astr1, astr2, len1, len2);
+  	  }
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / (double)CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / (double)elapsed;
+    
+    printf("[llcs_asci_t_f] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+}   
+      
+    /* ########## llcs_asci_t_b ########## */
+if (1) {  	   
+    tic = clock();
+
+    megaiters = 25;
+    
+    for (megacount = 0; megacount < megaiters; megacount++) {
+  	  for (count = 0; count < iters; count++) {
+      	  length_lcs = llcs_asci_t_b (astr1, astr2, len1, len2);
+  	  }
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / (double)CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / (double)elapsed;
+    
+    printf("[llcs_asci_t_b] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+}   
+   
+    /* ########## llcs_asci_t_p ########## */
+if (1) {  	   
+    tic = clock();
+
+    megaiters = 30;
+    
+    for (megacount = 0; megacount < megaiters; megacount++) {
+  	  for (count = 0; count < iters; count++) {
+      	  length_lcs = llcs_asci_t_p (astr1, astr2, len1, len2);
+  	  }
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / (double)CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / (double)elapsed;
+    
+    printf("[llcs_asci_t_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+}   
 
     /* ########## llcs_utf8_i ########## */
-
+/*
   
   	for (count = 0; count < 1; count++) {
       	//length_lcs = llcs_seq_utf8_i (str1, str2);
@@ -549,10 +727,10 @@ int main (void) {
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
     total += elapsed;
     rate    = (double)megaiters / elapsed;
-    printf("[llcs_utf8_i] Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
-
+    printf("[llcs_utf8_i] Elapsed: %f seconds Rate: %.1f (M/sec)\n", elapsed, rate);
+*/
     /* ######## LCS ############ */
-    
+/*    
   	    uint32_t len_a = strlen(str1);
   	    int32_t lcs[len_a][2]; 
   	    
@@ -593,8 +771,8 @@ int main (void) {
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
     total += elapsed;
     rate    = (double)megaiters / elapsed;
-    printf("[lcs_utf8_a] Elapsed: %f seconds Rate: %1f (M/sec)\n", elapsed, rate);
-
+    printf("[lcs_utf8_a] Elapsed: %f seconds Rate: %.1f (M/sec)\n", elapsed, rate);
+*/
     /* #################### */
     printf("Total: %f seconds\n", total);
                       

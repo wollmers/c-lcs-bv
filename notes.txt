@@ -157,24 +157,29 @@ lcs_utf8_a: 7
 ###############
 2019-10-14
 
+llcs_asci_t - ascii, table
+
 helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ time ./lcstest
+Storage size for char : 1 
 llcs_asci_i - ascii, stack, sequential addressing, store key
 llcs_asci_t - ascii, table
 llcs_utf8_i - utf-8, stack, sequential addressing, store key
 
 llcs_asci_i: 7
-[llcs_asci_i]      Elapsed: 1.209065 seconds Rate: 12.406281 (M/sec)
-llcs_asci_t: 7
-llcs_asci_t: 7
-[llcs_asci_t] Elapsed: 0.000001000 seconds Rate: 1000000000000.0 (T/sec)
-[llcs_utf8_i] Elapsed: 1.029697 seconds Rate: 9.711595 (M/sec)
+[llcs_asci_i]      Elapsed: 1.165119 seconds Rate: 12.9 (M/sec)
+llcs_asci_t: 7 l1: 10 l2: 11
+llcs_asci_t: 7 l1: 10 l2: 11
+[llcs_asci_t] Elapsed: 0.598749 seconds Rate: 33.4 (M/sec)
+[llcs_utf8_i] Elapsed: 0.989621 seconds Rate: 10.1 (M/sec)
 lcs_utf8_a: 7
 0	1	3	4	6	8	9	
 0	1	3	4	6	9	10	
-[lcs_utf8_a] Elapsed: 0.965734 seconds Rate: 3.106445 (M/sec)
-Total: 3.204497 seconds
+[lcs_utf8_a] Elapsed: 1.177155 seconds Rate: 2.5 (M/sec)
+Total: 3.930644 seconds
 
-real	0m3.210s
-user	0m3.205s
+real	0m3.935s
+user	0m3.931s
 sys	0m0.003s
+
+
 
