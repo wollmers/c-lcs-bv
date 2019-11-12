@@ -181,5 +181,52 @@ real	0m3.935s
 user	0m3.931s
 sys	0m0.003s
 
+#################
+2019-11-12
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+Storage size for char : 1 
+llcs_asci_i_p - ascii, stack, sequential addressing, store key
+llcs_asci_t_c - ascii, table, count_bits
+llcs_asci_t_f - ascii, table, count_bits_fast
+llcs_asci_t_b - ascii, table, __builtin_popcountll
+llcs_asci_t_p - ascii, table, _mm_popcnt_u64
+
+[llcs_asci_i_p] iters: 20 M Elapsed: 1.193325 s Rate: 16.8 (M/sec) 7
+[llcs_asci_t_c] iters: 15 M Elapsed: 0.327139 s Rate: 45.9 (M/sec) 7
+[llcs_asci_t_f] iters: 20 M Elapsed: 0.003587 s Rate: 5575.7 (M/sec) 7
+[llcs_asci_t_b] iters: 25 M Elapsed: 0.547168 s Rate: 45.7 (M/sec) 7
+[llcs_asci_t_p] iters: 30 M Elapsed: 0.653202 s Rate: 45.9 (M/sec) 7
+Total: 2.724421 seconds
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+Storage size for char : 1 
+llcs_asci_i_p - ascii, stack, sequential addressing, store key
+llcs_asci_t_c - ascii, table, count_bits
+llcs_asci_t_f - ascii, table, count_bits_fast
+llcs_asci_t_b - ascii, table, __builtin_popcountll
+llcs_asci_t_p - ascii, table, _mm_popcnt_u64
+
+[llcs_asci_i_p] iters: 20 M Elapsed: 1.187396 s Rate: 16.8 (M/sec) 7
+[llcs_asci_t_c] iters: 15 M Elapsed: 0.003920 s Rate: 3826.5 (M/sec) 7
+[llcs_asci_t_f] iters: 20 M Elapsed: 0.003484 s Rate: 5740.5 (M/sec) 7
+[llcs_asci_t_b] iters: 25 M Elapsed: 0.004440 s Rate: 5630.6 (M/sec) 7
+[llcs_asci_t_p] iters: 30 M Elapsed: 0.005272 s Rate: 5690.4 (M/sec) 7
+Total: 1.204512 seconds
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest
+llcs_asci_i_p - ascii, stack, sequential addressing, store key
+llcs_asci_t_c - ascii, table, count_bits
+llcs_asci_t_f - ascii, table, count_bits_fast
+llcs_asci_t_b - ascii, table, __builtin_popcountll
+llcs_asci_t_p - ascii, table, _mm_popcnt_u64
+
+[llcs_asci_i_p] iters: 20 M Elapsed: 1.193077 s Rate: 16.8 (M/sec) 7
+[llcs_asci_t_c] iters: 15 M Elapsed: 0.004048 s Rate: 3705.5 (M/sec) 7
+[llcs_asci_t_f] iters: 20 M Elapsed: 0.003486 s Rate: 5737.2 (M/sec) 7
+[llcs_asci_t_b] iters: 25 M Elapsed: 0.004348 s Rate: 5749.8 (M/sec) 7
+[llcs_asci_t_p] iters: 30 M Elapsed: 0.005233 s Rate: 5732.8 (M/sec) 7
+Total: 1.210192 seconds
+
 
 

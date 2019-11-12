@@ -1,3 +1,10 @@
+/* lcstest.c
+ *
+ * Copyright (C) 2015 - 2019, Helmut Wollmersdorfer, all rights reserved.
+ *
+*/
+
+
 #include <stdio.h>
 #include <limits.h>
 #include <time.h>
@@ -108,10 +115,8 @@ int count_bits_fast(uint64_t bits) {
     // 12 operations
     bits = bits - ((bits >> 1) & 0x5555555555555555ull);
     bits = (bits & 0x3333333333333333ull) + ((bits >> 2) & 0x3333333333333333ull);
-    // (bytesof(bits) -1) * bitsofbyte = (8-1)*8 = 56 ------------------------vv
-    bits = ((bits + (bits >> 4) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
-
-    return bits;
+    // (bytesof(bits) -1) * bitsofbyte = (8-1)*8 = 56 -------------------------------vv
+    return ((bits + (bits >> 4) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
 }
 
 
@@ -138,69 +143,36 @@ static uint64_t posbits[256] = {
 };
 */
 
-// use table (16 LoCs, 12 netLoCs, 22 instr)
+// use table (16 LoCs, 11 netLoCs) 
+// O(12*ceil(m/w) + 5*m + 7*ceil(m/w)*n)= 12*1 + 5*10 + 7*1*11 = 12 + 50 + 77 = 139
 int llcs_asci_t_f (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
 
-static uint64_t posbits[256] = {
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-};
+    static uint64_t posbits[256] = { 0 };
 
     uint32_t i;
-
-/*    
-    static uint64_t posbits[256];
-
-
-    for (i=0; i<256; i++) { 
-        posbits[i] = 0;      
-    }
-*/
+    // 5 instr * ceil(m/w) * m
     for (i=0; i < alen; i++){
       	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
     }    
 
     uint64_t v = ~0ull;
-
+    // 7 instr * ceil(m/w)*n
     for (i=0; i < blen; i++){
       uint64_t p = posbits[(unsigned int)b[i]];
       uint64_t u = v & p;
       v = (v + u) | (v - u);
     }
-    
+    // 12 instr * ceil(m/w)
     return count_bits_fast(~v); 
 }
 
 // use table (16 LoCs, 12 netLoCs, 22 instr)
+// O(24*ceil(m/w) + 5*m + 7*ceil(m/w)*n)= 24*1 + 5*10 + 7*1*11 = 24 + 50 + 77 = 151
 int llcs_asci_t_c (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
-    
-static uint64_t posbits[256] = {
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-};
+
+    static uint64_t posbits[256] = { 0 };
 
     uint32_t i;
-
-/*    
-    static uint64_t posbits[256];
-
-
-    for (i=0; i<256; i++) { 
-        posbits[i] = 0;      
-    }
-*/
 
     for (i=0; i < alen; i++){
       	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
@@ -214,33 +186,15 @@ static uint64_t posbits[256] = {
       v = (v + u) | (v - u);
     }
     
-    return count_bits(~v);           // perfect portable
+    return count_bits(~v);
 }
 
 // use table (16 LoCs, 12 netLoCs, 22 instr)
 int llcs_asci_t_b (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
-    
-static uint64_t posbits[256] = {
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-};
+
+    static uint64_t posbits[256] = { 0 };
 
     uint32_t i;
-
-/*    
-    static uint64_t posbits[256];
-
-
-    for (i=0; i<256; i++) { 
-        posbits[i] = 0;      
-    }
-*/
 
     for (i=0; i < alen; i++){
       	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
@@ -259,28 +213,10 @@ static uint64_t posbits[256] = {
 
 // use table (16 LoCs, 12 netLoCs, 22 instr)
 int llcs_asci_t_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
-    
-static uint64_t posbits[256] = {
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-};
+
+    static uint64_t posbits[256] = { 0 };
 
     uint32_t i;
-
-/*    
-    static uint64_t posbits[256];
-
-
-    for (i=0; i<256; i++) { 
-        posbits[i] = 0;      
-    }
-*/
 
     for (i=0; i < alen; i++){
       	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
@@ -332,8 +268,6 @@ int llcs_asci_a (char * a, char * b) {
     }
     
     return count_bits(~v);
-    //return __builtin_popcountll(~v); // portable
-    //return _mm_popcnt_u64(~v);
 }
 
 
@@ -545,8 +479,8 @@ int lcs_seq_utf8_a (char * a, char * b, int32_t (* lcs)[2]) {
 }
 
 
-/*
-if (SvUTF8 (sv))
+/* convert utf8 to uvchr with XS macros
+  if (SvUTF8 (sv))
     {
        STRLEN clen;
        while (len)
@@ -579,8 +513,8 @@ int main (void) {
     uint64_t megacount;
     uint32_t iters     = 1000000;
     uint32_t megaiters = 1;
-    
-    
+
+    // m=10, n=11, llcs=7, sim=0.667
     char str1[] = "Choerephon";
     char str2[] = "Chrerrplzon";
     
@@ -589,12 +523,6 @@ int main (void) {
     
     uint32_t len1 = strlen(str1);
     uint32_t len2 = strlen(str2);
-    
-    //uint32_t alen1 = strlen(astr1);
-    //uint32_t alen2 = strlen(astr2);
-    
-    printf("Storage size for char : %lu \n", sizeof(char));
-
     
     int length_lcs;
     /* ################### */
@@ -609,7 +537,7 @@ int main (void) {
 
     /* ######### llcs_asci_i_p ########### */
     
-//if (1) {
+if (1) {
     tic = clock();
     megaiters = 20;
     for (megacount = 0; megacount < megaiters; megacount++) {
@@ -622,8 +550,9 @@ int main (void) {
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
     total += elapsed;
     rate    = (double)megaiters / elapsed;
-    printf("[llcs_asci_i_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
-//}     
+    printf("[llcs_asci_i_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
+}     
     /* ########## llcs_asci_t_c ########## */
 if (1) {  	   
     tic = clock();
@@ -641,7 +570,8 @@ if (1) {
     total += elapsed;
     rate    = (double)megaiters / (double)elapsed;
     
-    printf("[llcs_asci_t_c] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+    printf("[llcs_asci_t_c] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
 }  
           
     /* ########## llcs_asci_t_f ########## */
@@ -661,7 +591,8 @@ if (1) {
     total += elapsed;
     rate    = (double)megaiters / (double)elapsed;
     
-    printf("[llcs_asci_t_f] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+    printf("[llcs_asci_t_f] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
 }   
       
     /* ########## llcs_asci_t_b ########## */
@@ -681,7 +612,8 @@ if (1) {
     total += elapsed;
     rate    = (double)megaiters / (double)elapsed;
     
-    printf("[llcs_asci_t_b] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+    printf("[llcs_asci_t_b] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
 }   
    
     /* ########## llcs_asci_t_p ########## */
@@ -701,7 +633,8 @@ if (1) {
     total += elapsed;
     rate    = (double)megaiters / (double)elapsed;
     
-    printf("[llcs_asci_t_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", megaiters, elapsed, rate, length_lcs);
+    printf("[llcs_asci_t_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
 }   
 
     /* ########## llcs_utf8_i ########## */
