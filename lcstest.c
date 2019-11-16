@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <nmmintrin.h>
 
+static const uint64_t width = 64;
 
 typedef struct {
     void **keys;
@@ -24,7 +25,16 @@ typedef struct {
     uint32_t *ikeys;
     uint64_t *bits;
 } Hashi;
- 
+
+typedef struct {
+    uint32_t keyfilter;
+    uint32_t freeslot;
+    uint32_t *ifkeys;
+    uint64_t *bits;
+} Hashif;
+
+/***** Hash *****/
+
 // memcmp; insert or return 
 int hash_index (Hash *hash, char *key, uint32_t keylen) {
     int index = 0;
@@ -36,6 +46,24 @@ int hash_index (Hash *hash, char *key, uint32_t keylen) {
     return index;
 } 
 
+// update bitmap
+void hash_setpos (Hash *hash, void *key, uint32_t pos, uint32_t keylen) {
+    int index = hash_index(hash, key, keylen);
+    if (hash->keys[index] == 0) {
+      	hash->keys[index] = key;
+      	hash->lens[index] = keylen;
+    }
+    hash->bits[index] |= 0x1ull << (pos % 64);
+}
+
+// get position bitmap
+uint64_t hash_getpos (Hash *hash, void *key, uint32_t keylen) {
+    int index = hash_index(hash, key, keylen);
+    return hash->bits[index];
+}
+
+/***** Hashi *****/
+
 inline int hashi_index (Hashi *hashi, uint32_t key) {    
     int index = 0;                                        
     while ( hashi->ikeys[index]                           
@@ -44,29 +72,13 @@ inline int hashi_index (Hashi *hashi, uint32_t key) {
     }                                                     
     return index;                                         
 }
- 
-// update bitmap
-void hash_setpos (Hash *hash, void *key, uint32_t pos, uint32_t keylen) {
-    int index = hash_index(hash, key, keylen);
-    if (hash->keys[index] == 0) {
-      	hash->keys[index] = key;
-      	hash->lens[index] = keylen;
-    }
-    hash->bits[index] |= 1 << (pos % 64);
-}
 
 inline void hashi_setpos (Hashi *hashi, uint32_t key, uint32_t pos) {
     int index = hashi_index(hashi, key);
     if (hashi->ikeys[index] == 0) {
       	hashi->ikeys[index] = key;
     }
-    hashi->bits[index] |= 1 << (pos % 64);
-}
- 
-// get position bitmap
-uint64_t hash_getpos (Hash *hash, void *key, uint32_t keylen) {
-    int index = hash_index(hash, key, keylen);
-    return hash->bits[index];
+    hashi->bits[index] |= 0x1ull << (pos % 64);
 }
 
 // get position bitmap
@@ -74,6 +86,32 @@ inline uint64_t hashi_getpos (Hashi *hashi, uint32_t key) {
     int index = hashi_index(hashi, key);
     return hashi->bits[index];
 }
+
+/***** Hashif *****/
+
+inline int hashif_index (Hashif *hashif, uint32_t key) {    
+    int index = 0;                                        
+    while ( hashif->ifkeys[index]                           
+           && ((uint32_t)hashif->ifkeys[index] != key) ) {  
+        index++;                                          
+    }                                                     
+    return index;                                         
+}
+
+inline void hashif_setpos (Hashif *hashif, uint32_t key, uint32_t pos) {
+    int index = hashif_index(hashif, key);
+    if (hashif->ifkeys[index] == 0) {
+      	hashif->ifkeys[index] = key;
+    }
+    hashif->bits[index] |= 0x1ull << (pos % 64);
+}
+
+// get position bitmap
+inline uint64_t hashif_getpos (Hashif *hashif, uint32_t key) {
+    int index = hashif_index(hashif, key);
+    return hashif->bits[index];
+}
+/***********************/
 
 void hash_debug (Hash *hash, char *desc) {
 //void hash_debug (Hash *hash) {
@@ -145,14 +183,48 @@ static uint64_t posbits[256] = {
 
 // use table (16 LoCs, 11 netLoCs) 
 // O(12*ceil(m/w) + 5*m + 7*ceil(m/w)*n)= 12*1 + 5*10 + 7*1*11 = 12 + 50 + 77 = 139
+int llcs_asci_pre (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen, int prep) {
+ 
+    static uint64_t posbits[128] = { 0 };
+    uint64_t i;
+    
+    if (prep > 0) {
+        for (i=0; i < 128; i++){
+          posbits[i] = 0;
+        }
+
+    // 5 instr * ceil(m/w) * m
+        for (i=0; i < alen; i++){
+      	    posbits[(unsigned int)a[i]] |= 0x1ull << (i % width);
+        }    
+    }
+    
+    uint64_t v = ~0ull;
+    // 7 instr * ceil(m/w)*n
+    for (i=0; i < blen; i++){
+      uint64_t p = posbits[(unsigned int)b[i]];
+      uint64_t u = v & p;
+      v = (v + u) | (v - u);
+    }
+    // 12 instr * ceil(m/w)
+    return count_bits_fast(~v); 
+}
+
+// use table (16 LoCs, 11 netLoCs) 
+// O(12*ceil(m/w) + 5*m + 7*ceil(m/w)*n)= 12*1 + 5*10 + 7*1*11 = 12 + 50 + 77 = 139
 int llcs_asci_t_f (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t blen) {
 
-    static uint64_t posbits[256] = { 0 };
+    static uint64_t posbits[128] = { 0 };
+    uint64_t i;
+    
+    for (i=0; i < 128; i++){
+      posbits[i] = 0;
+    }
 
-    uint32_t i;
+    
     // 5 instr * ceil(m/w) * m
     for (i=0; i < alen; i++){
-      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+      	posbits[(unsigned int)a[i]] |= 0x1ull << (i % width);
     }    
 
     uint64_t v = ~0ull;
@@ -175,7 +247,7 @@ int llcs_asci_t_c (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t
     uint32_t i;
 
     for (i=0; i < alen; i++){
-      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+      	posbits[(unsigned int)a[i]] |= 0x1ull << (i % 64);
     }    
 
     uint64_t v = ~0ull;
@@ -197,7 +269,7 @@ int llcs_asci_t_b (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t
     uint32_t i;
 
     for (i=0; i < alen; i++){
-      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+      	posbits[(unsigned int)a[i]] |= 0x1ull << (i % 64);
     }    
 
     uint64_t v = ~0ull;
@@ -219,7 +291,7 @@ int llcs_asci_t_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t
     uint32_t i;
 
     for (i=0; i < alen; i++){
-      	posbits[(unsigned int)a[i]] |= 1 << (i % 64);
+      	posbits[(unsigned int)a[i]] |= 0x1ull << (i % 64);
     }    
 
     uint64_t v = ~0ull;
@@ -353,6 +425,102 @@ int llcs_asci_i_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t
     
     //return count_bits(~v);
     //return __builtin_popcountll(~v); // portable
+    return _mm_popcnt_u64(~v);
+}
+
+//void * memcpy(void *to, const void *from, size_t numBytes);
+
+// ptr ==> Starting address of memory to be filled
+// x   ==> Value to be filled
+// n   ==> Number of bytes to be filled starting 
+//         from ptr to be filled
+// void *memset(void *ptr, int x, size_t n);
+
+int llcs_utf8_i_m (char * a, char * b, uint32_t alen, uint32_t blen) {
+    
+    Hashi hashi;
+    uint32_t ikeys[alen+1];
+    uint64_t bits[alen+1];
+    hashi.ikeys = ikeys;
+    hashi.bits = bits;
+
+    int32_t i;
+    for (i=0;i<=alen;i++) { 
+      hashi.ikeys[i] = 0;
+      hashi.bits[i] = 0;      
+    }
+
+    uint32_t q, keylen;
+    uint32_t key;
+    uint32_t keyfilter = 0;
+    //uint32_t k;
+    //for (i=0,q=0; (unsigned char)a[q] != '\0'; i++,q+=keylen){
+    for (i=0,q=0; q < alen; i++,q+=keylen){
+        keylen = allBytesForUTF8[(unsigned int)(unsigned char)a[q]];
+        //for (k=0,key=0; k < keylen; k++) {
+        //  key = key << 8 | a[q+k];
+        //}
+        //key=0;
+        /* switch(keylen){
+            case 1:
+               key = a[q];
+               break;
+            case 2:
+               key = (a[q] << 8) | (a[q+1]);
+               break;
+            case 3:
+               key = (a[q] << 16) | (a[q+1] << 8) | (a[q+2]);
+               break;
+            case 4:
+               key = (a[q] << 24) | (a[q+1] << 16) | (a[q+2] << 8) | (a[q+3]);
+               break;
+        }; */
+
+        if (keylen == 1) {
+            key = a[q];
+        }
+        else if (keylen == 2) {
+            key = (a[q] << 8) | (a[q+1]);
+        }
+        else if (keylen == 3) {
+            key = (a[q] << 16) | (a[q+1] << 8) | (a[q+2]);
+        }
+        else if (keylen == 4) {
+            key = (a[q] << 24) | (a[q+1] << 16) | (a[q+2] << 8) | (a[q+3]);
+        }
+        keyfilter |= key;
+      	hashi_setpos (&hashi, key, i);
+    }
+    
+    uint64_t v = ~0ull;
+    //int32_t j;
+
+    //for (q=0; (unsigned char)b[q] != '\0'; q+=keylen){
+    for (i=0,q=0; q < blen; i++,q+=keylen){
+        keylen = allBytesForUTF8[(unsigned int)(unsigned char)b[q]];
+        //for (k=0,key=0; k < keylen; k++) {
+        //  key = key << 8 | b[q+k];
+        //}
+        //key=0;
+        if (keylen == 1) {
+            key = b[q];
+        }
+        else if (keylen == 2) {
+            key = (b[q] << 8) | (b[q+1]);
+        }
+        else if (keylen == 3) {
+            key = (b[q] << 16) | (b[q+1] << 8) | (b[q+2]);
+        }
+        else if (keylen == 4) {
+            key = (b[q] << 24) | (b[q+1] << 16) | (b[q+2] << 8) | (b[q+3]);
+        }     
+
+        uint64_t p = hashi_getpos (&hashi, key);   
+        uint64_t u = v & p;
+        v = (v + u) | (v - u);
+    }
+
+    //return count_bits(~v);
     return _mm_popcnt_u64(~v);
 }
 
@@ -518,6 +686,9 @@ int main (void) {
     char str1[] = "Choerephon";
     char str2[] = "Chrerrplzon";
     
+    //char str1[] = "Chöerephön";
+    //char str2[] = "Chrerrplzön";
+    
     unsigned char astr1[] = "Choerephon";
     unsigned char astr2[] = "Chrerrplzon";
     
@@ -528,16 +699,39 @@ int main (void) {
     /* ################### */
 
     printf("llcs_asci_i_p - ascii, stack, sequential addressing, store key\n");
+    printf("llcs_asci_pre - ascii, table, prepared\n");
     printf("llcs_asci_t_c - ascii, table, count_bits\n");
     printf("llcs_asci_t_f - ascii, table, count_bits_fast\n");
     printf("llcs_asci_t_b - ascii, table, __builtin_popcountll\n");
     printf("llcs_asci_t_p - ascii, table, _mm_popcnt_u64\n");
-    //printf("llcs_utf8_i - utf-8, stack, sequential addressing, store key\n");
+    printf("llcs_utf8_i   - utf-8, stack, sequential, store key\n");
+    printf("llcs_utf8_i_m - utf-8, stack, sequential, store key, switch\n");
     printf("\n");
+
+    /* ######### llcs_asci_pre ########### */
+    
+if (1) {
+    length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 1);
+    
+    tic = clock();
+    megaiters = 20;
+    for (megacount = 0; megacount < megaiters; megacount++) {
+  	  for (count = 0; count < iters; count++) {
+      	length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 0);
+  	  }
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / elapsed;
+    printf("[llcs_asci_pre] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
+}     
 
     /* ######### llcs_asci_i_p ########### */
     
-if (1) {
+if (0) {
     tic = clock();
     megaiters = 20;
     for (megacount = 0; megacount < megaiters; megacount++) {
@@ -554,7 +748,7 @@ if (1) {
         megaiters, elapsed, rate, length_lcs);
 }     
     /* ########## llcs_asci_t_c ########## */
-if (1) {  	   
+if (0) {  	   
     tic = clock();
 
     megaiters = 15;
@@ -596,7 +790,7 @@ if (1) {
 }   
       
     /* ########## llcs_asci_t_b ########## */
-if (1) {  	   
+if (0) {  	   
     tic = clock();
 
     megaiters = 25;
@@ -617,7 +811,7 @@ if (1) {
 }   
    
     /* ########## llcs_asci_t_p ########## */
-if (1) {  	   
+if (0) {  	   
     tic = clock();
 
     megaiters = 30;
@@ -636,16 +830,28 @@ if (1) {
     printf("[llcs_asci_t_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
         megaiters, elapsed, rate, length_lcs);
 }   
-
-    /* ########## llcs_utf8_i ########## */
-/*
-  
-  	for (count = 0; count < 1; count++) {
-      	//length_lcs = llcs_seq_utf8_i (str1, str2);
-      	length_lcs = llcs_utf8_i (str1, str2, len1, len2);
-      	//printf("llcs - utf8, stack, sequential addressing\n");
-      	//printf("llcs_utf8_i: %d\n", length_lcs);
+    /* ########## llcs_utf8_i_m ########## */
+if (1) { 
+     
+    tic = clock();
+    
+    megaiters = 10;
+    for (megacount = 0; megacount < megaiters; megacount++) {   
+  	  for (count = 0; count < iters; count++) {
+      	length_lcs = llcs_utf8_i_m (str1, str2, len1, len2);
+  	  }
   	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / elapsed;
+    printf("[llcs_utf8_i_m] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
+}
+    /* ########## llcs_utf8_i ########## */
+
+if (1) {   
      
     tic = clock();
     
@@ -660,8 +866,9 @@ if (1) {
     elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
     total += elapsed;
     rate    = (double)megaiters / elapsed;
-    printf("[llcs_utf8_i] Elapsed: %f seconds Rate: %.1f (M/sec)\n", elapsed, rate);
-*/
+    printf("[llcs_utf8_i] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
+}
     /* ######## LCS ############ */
 /*    
   	    uint32_t len_a = strlen(str1);
