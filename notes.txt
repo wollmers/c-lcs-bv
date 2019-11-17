@@ -228,5 +228,59 @@ llcs_asci_t_p - ascii, table, _mm_popcnt_u64
 [llcs_asci_t_p] iters: 30 M Elapsed: 0.005233 s Rate: 5732.8 (M/sec) 7
 Total: 1.210192 seconds
 
+2019-11-17
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest 
+llcs_utf8_i   - utf-8, stack, sequential, store key
+llcs_utf8_i_m - utf-8, stack, sequential, store key, switch
+
+[llcs_utf8_i_m] iters: 10 M Elapsed: 1.043703 s Rate: 9.6 (M/sec) 7
+[llcs_utf8_i] iters: 10 M Elapsed: 1.034840 s Rate: 9.7 (M/sec) 7
+
+# tune setpos(), getpos
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest 
+llcs_utf8_i   - utf-8, stack, sequential, store key
+llcs_utf8_i_m - utf-8, stack, sequential, store key, switch
+
+[llcs_utf8_i_m] iters: 10 M Elapsed: 0.893972 s Rate: 11.2 (M/sec) 7
+[llcs_utf8_i] iters: 10 M Elapsed: 0.868023 s Rate: 11.5 (M/sec) 7
+
+# remove if (hashi->ikeys[index] == 0) { from setpos()
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest 
+llcs_utf8_i   - utf-8, stack, sequential, store key
+llcs_utf8_i_m - utf-8, stack, sequential, store key, switch
+
+[llcs_utf8_i_m] iters: 10 M Elapsed: 0.912018 s Rate: 11.0 (M/sec) 7
+[llcs_utf8_i] iters: 10 M Elapsed: 0.855905 s Rate: 11.7 (M/sec) 7
+
+# try if (!hashi->ikeys[index]) { 
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest 
+llcs_utf8_i   - utf-8, stack, sequential, store key
+llcs_utf8_i_m - utf-8, stack, sequential, store key, switch
+
+[llcs_utf8_i_m] iters: 10 M Elapsed: 0.902160 s Rate: 11.1 (M/sec) 7
+[llcs_utf8_i] iters: 10 M Elapsed: 0.868812 s Rate: 11.5 (M/sec) 7
+
+#### keep (hashi->ikeys[index] == 0) {
+
+# convert to codepoints
+
+helmut@Helmuts-MacBook-Pro:~/github/c/c-lcs-bv$ ./lcstest 
+llcs_utf8_i   - utf-8, stack, sequential, store key
+llcs_utf8_i_m - utf-8, stack, sequential, store key, elsif
+llcs_utf8_int - utf-8, stack, sequential, store key, uvchr
+
+[llcs_utf8_int] iters: 10 M Elapsed: 1.057022 s Rate: 9.5 (M/sec) 9
+[llcs_utf8_i_m] iters: 10 M Elapsed: 0.881567 s Rate: 11.3 (M/sec) 7
+[llcs_utf8_i] iters: 10 M Elapsed: 0.860703 s Rate: 11.6 (M/sec) 7
+
+# remove codepoints
+
+
+
+
 
 

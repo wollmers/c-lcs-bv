@@ -74,16 +74,24 @@ inline int hashi_index (Hashi *hashi, uint32_t key) {
 }
 
 inline void hashi_setpos (Hashi *hashi, uint32_t key, uint32_t pos) {
-    int index = hashi_index(hashi, key);
-    if (hashi->ikeys[index] == 0) {
+    int index = 0;                                        
+    while ( hashi->ikeys[index]                           
+           && ((uint32_t)hashi->ikeys[index] != key) ) {  
+        index++;                                          
+    }        
+    if (hashi->ikeys[index] == 0) { 
       	hashi->ikeys[index] = key;
     }
     hashi->bits[index] |= 0x1ull << (pos % 64);
 }
 
-// get position bitmap
+
 inline uint64_t hashi_getpos (Hashi *hashi, uint32_t key) {
-    int index = hashi_index(hashi, key);
+    int index = 0;  
+    while ( hashi->ikeys[index]                           
+           && ((uint32_t)hashi->ikeys[index] != key) ) {  
+        index++;                                          
+    }  
     return hashi->bits[index];
 }
 
@@ -436,6 +444,85 @@ int llcs_asci_i_p (unsigned char * a, unsigned char * b, uint32_t alen, uint32_t
 //         from ptr to be filled
 // void *memset(void *ptr, int x, size_t n);
 
+int llcs_utf8_int (char * a, char * b, uint32_t alen, uint32_t blen) {
+    
+    Hashi hashi;
+    uint32_t ikeys[alen+1];
+    uint64_t bits[alen+1];
+    hashi.ikeys = ikeys;
+    hashi.bits = bits;
+
+    int32_t i;
+    for (i=0;i<=alen;i++) { 
+      hashi.ikeys[i] = 0;
+      hashi.bits[i] = 0;      
+    }
+
+    uint32_t q, keylen;
+    uint32_t key;
+    //uint32_t keyfilter = 0;
+    //uint32_t k;
+    //for (i=0,q=0; (unsigned char)a[q] != '\0'; i++,q+=keylen){
+    for (i=0,q=0; q < alen; i++,q+=keylen){
+        keylen = allBytesForUTF8[(unsigned int)(unsigned char)a[q]];
+
+        if (keylen == 1) {
+            key = b[q];
+        }
+        else if (keylen == 2) {
+            // 110x xxxx  10xx xxxx
+            // key = (b[q] << 8) | (b[q+1]);
+            key = ((b[q] & 0x3ful)<< 6) | (b[q+1] & 0x3ful);
+        }
+        else if (keylen == 3) {
+            // 1110 xxxx  10xx xxxx  10xx xxxx
+            // key = (a[q] << 16) | (a[q+1] << 8) | (a[q+2]);
+            key = ((b[q] & 0xful) << 12) | ((b[q+1] & 0x3ful) << 6) | (b[q+2] & 0x3ful);
+        }
+        else if (keylen == 4) {
+            // 1111 0xxx  10xx xxxx  10xx xxxx  10xx xxxx 
+            // key = (b[q] << 24) | (b[q+1] << 16) | (b[q+2] << 8) | (b[q+3]);
+            key = ((b[q] & 0x7ul) << 18) | ((b[q+1] & 0xful) << 12) | ((b[q+2] & 0x3ful) << 6) | (b[q+3] & 0x3ful);
+        }   
+        //keyfilter |= key;
+      	hashi_setpos (&hashi, key, i);
+    }
+    
+    uint64_t v = ~0ull;
+    //int32_t j;
+
+    //for (q=0; (unsigned char)b[q] != '\0'; q+=keylen){
+    for (i=0,q=0; q < blen; i++,q+=keylen){
+        keylen = allBytesForUTF8[(unsigned int)(unsigned char)b[q]];
+
+        if (keylen == 1) {
+            key = b[q];
+        }
+        else if (keylen == 2) {
+            // 110x xxxx  10xx xxxx
+            // key = (b[q] << 8) | (b[q+1]);
+            key = ((b[q] & 0x3ful)<< 6) | (b[q+1] & 0x3ful);
+        }
+        else if (keylen == 3) {
+            // 1110 xxxx  10xx xxxx  10xx xxxx
+            // key = (a[q] << 16) | (a[q+1] << 8) | (a[q+2]);
+            key = ((b[q] & 0xful) << 12) | ((b[q+1] & 0x3ful) << 6) | (b[q+2] & 0x3ful);
+        }
+        else if (keylen == 4) {
+            // 1111 0xxx  10xx xxxx  10xx xxxx  10xx xxxx 
+            // key = (b[q] << 24) | (b[q+1] << 16) | (b[q+2] << 8) | (b[q+3]);
+            key = ((b[q] & 0x7ul) << 18) | ((b[q+1] & 0xful) << 12) | ((b[q+2] & 0x3ful) << 6) | (b[q+3] & 0x3ful);
+        }     
+
+        uint64_t p = hashi_getpos (&hashi, key);   
+        uint64_t u = v & p;
+        v = (v + u) | (v - u);
+    }
+
+    //return count_bits(~v);
+    return _mm_popcnt_u64(~v);
+}
+
 int llcs_utf8_i_m (char * a, char * b, uint32_t alen, uint32_t blen) {
     
     Hashi hashi;
@@ -506,13 +593,19 @@ int llcs_utf8_i_m (char * a, char * b, uint32_t alen, uint32_t blen) {
             key = b[q];
         }
         else if (keylen == 2) {
+            // 110x xxxx  10xx xxxx
             key = (b[q] << 8) | (b[q+1]);
+            // key = ((b[q] & 0x3ful)<< 6) | (b[q+1] & 0x3ful);
         }
         else if (keylen == 3) {
-            key = (b[q] << 16) | (b[q+1] << 8) | (b[q+2]);
+            // 1110 xxxx  10xx xxxx  10xx xxxx
+            key = (a[q] << 16) | (a[q+1] << 8) | (a[q+2]);
+            // key = ((b[q] & 0xful) << 12) | ((b[q+1] & 0x3ful) << 6) | (b[q+2] & 0x3ful);
         }
         else if (keylen == 4) {
+            // 1111 0xxx  10xx xxxx  10xx xxxx  10xx xxxx 
             key = (b[q] << 24) | (b[q+1] << 16) | (b[q+2] << 8) | (b[q+3]);
+            // key = ((b[q]& 0x7ul) << 18) | (b[q+1] & 0xful) << 12) | ((b[q+2] & 0x3ful) << 6) | (b[q+3] & 0x3ful);
         }     
 
         uint64_t p = hashi_getpos (&hashi, key);   
@@ -683,11 +776,11 @@ int main (void) {
     uint32_t megaiters = 1;
 
     // m=10, n=11, llcs=7, sim=0.667
-    char str1[] = "Choerephon";
-    char str2[] = "Chrerrplzon";
+    //char str1[] = "Choerephon";
+    //char str2[] = "Chrerrplzon";
     
-    //char str1[] = "Chöerephön";
-    //char str2[] = "Chrerrplzön";
+    char str1[] = "Chöerephön";
+    char str2[] = "Chrerrplzön";
     
     unsigned char astr1[] = "Choerephon";
     unsigned char astr2[] = "Chrerrplzon";
@@ -697,27 +790,29 @@ int main (void) {
     
     int length_lcs;
     /* ################### */
-
+/*
     printf("llcs_asci_i_p - ascii, stack, sequential addressing, store key\n");
     printf("llcs_asci_pre - ascii, table, prepared\n");
     printf("llcs_asci_t_c - ascii, table, count_bits\n");
     printf("llcs_asci_t_f - ascii, table, count_bits_fast\n");
     printf("llcs_asci_t_b - ascii, table, __builtin_popcountll\n");
     printf("llcs_asci_t_p - ascii, table, _mm_popcnt_u64\n");
+*/
     printf("llcs_utf8_i   - utf-8, stack, sequential, store key\n");
-    printf("llcs_utf8_i_m - utf-8, stack, sequential, store key, switch\n");
+    printf("llcs_utf8_i_m - utf-8, stack, sequential, store key, elsif\n");
+    printf("llcs_utf8_int - utf-8, stack, sequential, store key, uvchr\n");
     printf("\n");
 
     /* ######### llcs_asci_pre ########### */
     
-if (1) {
-    length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 1);
+if (0) {
+    length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 1); // prepare
     
     tic = clock();
     megaiters = 20;
     for (megacount = 0; megacount < megaiters; megacount++) {
   	  for (count = 0; count < iters; count++) {
-      	length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 0);
+      	length_lcs = llcs_asci_pre (astr1, astr2, len1, len2, 0); // reuse
   	  }
   	}
 
@@ -769,7 +864,7 @@ if (0) {
 }  
           
     /* ########## llcs_asci_t_f ########## */
-if (1) { 	   
+if (0) { 	   
     tic = clock();
 
     megaiters = 20;
@@ -830,6 +925,28 @@ if (0) {
     printf("[llcs_asci_t_p] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
         megaiters, elapsed, rate, length_lcs);
 }   
+
+
+    /* ########## llcs_utf8_int ########## */
+if (1) { 
+     
+    tic = clock();
+    
+    megaiters = 10;
+    for (megacount = 0; megacount < megaiters; megacount++) {   
+  	  for (count = 0; count < iters; count++) {
+      	length_lcs = llcs_utf8_int (str1, str2, len1, len2);
+  	  }
+  	}
+
+    toc = clock();
+    elapsed = (double)(toc - tic) / CLOCKS_PER_SEC;
+    total += elapsed;
+    rate    = (double)megaiters / elapsed;
+    printf("[llcs_utf8_int] iters: %u M Elapsed: %f s Rate: %.1f (M/sec) %u\n", 
+        megaiters, elapsed, rate, length_lcs);
+}
+
     /* ########## llcs_utf8_i_m ########## */
 if (1) { 
      

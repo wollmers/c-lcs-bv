@@ -5,8 +5,8 @@ len code                                         0  1  2  3     chars
 2   110x xxxx  10xx xxxx                        32 64            2080 7FF
 3   1110 xxxx  10xx xxxx  10xx xxxx             16 64 64        65536 FFFF
 4   1111 0xxx  10xx xxxx  10xx xxxx  10xx xxxx   8 64 64 64   2097152 1FFFFF
-5   1111 10xx  10xx xxxx  10xx xxxx  10xx xxxx  10xx xxxx
-10FFFF           00 0100    00 ffff    ff ffFF    FF FFFF
+
+10FFFF   0100    00 ffff    ff ffFF    FF FFFF                1114111 10FFFF
 
 level 0 low   high from  to
 128     0     127     0  127
@@ -32,5 +32,9 @@ B chars slots    B=40    B=64
 Bytes total      1920    3072
 
  Latin-1 Supplement 0080-00FF
- Latin Extended-A   017F-017F
+ Latin Extended-A   0100-017F
+ 
+ Cyrillic 0400-04FF
+ 
+ Katakana 30A0-30FF
   
